@@ -15,7 +15,8 @@ struct Lexer {
 
 impl Lexer {
     fn new(input: &str) -> Self {
-        let mut tokens = input.chars()
+        let mut tokens = input
+            .chars()
             .filter(|c| !c.is_ascii_whitespace())
             .map(|c| match c {
                 '0'..='9' | 'a'..='z' | 'A'..='Z' => Token::Atom(c),
@@ -57,12 +58,10 @@ impl fmt::Display for S {
     }
 }
 
-
 fn expr(input: &str) -> S {
     let mut lexer = Lexer::new(input);
     expr_bp(&mut lexer, 0)
 }
-
 
 fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> S {
     let mut lhs = match lexer.next() {
@@ -80,7 +79,7 @@ fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> S {
                 panic!("bad token: {:?}", t);
             }
         };
-        
+
         let (l_bp, r_bp) = infix_binding_power(op);
         if l_bp < min_bp {
             break;
@@ -88,7 +87,7 @@ fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> S {
 
         lexer.next();
         let rhs = expr_bp(lexer, r_bp);
-        
+
         lhs = S::Cons(op, vec![lhs, rhs])
     }
 
@@ -99,10 +98,10 @@ fn infix_binding_power(op: char) -> (u8, u8) {
     match op {
         '+' | '-' => (1, 2),
         '*' | '/' => (3, 4),
+        '.' => (6, 5),
         _ => unreachable!(),
     }
 }
-
 
 #[test]
 fn tests() {
@@ -114,4 +113,10 @@ fn tests() {
 
     let s = expr("a + b * c * d + e");
     assert_eq!(s.to_string(), "(+ (+ a (* (* b c) d)) e)");
+
+    let s = expr("f . g . h");
+    assert_eq!(s.to_string(), "(. f (. g h))");
+    
+    let s = expr(" 1 + 2 + f . g . h * 3 * 4");
+    assert_eq!(s.to_string(), "(+ (+ 1 2) (* (* (. f (. g h)) 3) 4))");
 }
