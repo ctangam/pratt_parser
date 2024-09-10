@@ -66,6 +66,12 @@ fn expr(input: &str) -> S {
 fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> S {
     let mut lhs = match lexer.next() {
         Token::Atom(it) => S::Atom(it),
+        Token::Op(op) => {
+            let ((), r_bp) = prefix_binding_power(op);
+
+            let rhs = expr_bp(lexer, r_bp);
+            S::Cons(op, vec![rhs])
+        }
         t => {
             panic!("bad token: {:?}", t);
         }
@@ -94,11 +100,18 @@ fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> S {
     lhs
 }
 
+fn prefix_binding_power(op: char) -> ((), u8) {
+    match op {
+        '+' | '-' => ((), 5),
+        _ => unreachable!(),
+    }
+}
+
 fn infix_binding_power(op: char) -> (u8, u8) {
     match op {
         '+' | '-' => (1, 2),
         '*' | '/' => (3, 4),
-        '.' => (6, 5),
+        '.' => (8, 7),
         _ => unreachable!(),
     }
 }
@@ -116,7 +129,13 @@ fn tests() {
 
     let s = expr("f . g . h");
     assert_eq!(s.to_string(), "(. f (. g h))");
-    
+
     let s = expr(" 1 + 2 + f . g . h * 3 * 4");
     assert_eq!(s.to_string(), "(+ (+ 1 2) (* (* (. f (. g h)) 3) 4))");
+
+    let s = expr("--1 * 2");
+    assert_eq!(s.to_string(), "(* (- (- 1)) 2)");
+    
+    let s = expr("--f . g");
+    assert_eq!(s.to_string(), "(- (- (. f g)))");
 }
