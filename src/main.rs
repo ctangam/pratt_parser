@@ -86,6 +86,15 @@ fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> S {
             }
         };
 
+        if let Some((l_bp, _)) = postfix_binding_power(op) {
+            if l_bp < min_bp {
+                break;
+            }
+            lexer.next();
+            lhs = S::Cons(op, vec![lhs]);
+            continue;
+        }
+
         let (l_bp, r_bp) = infix_binding_power(op);
         if l_bp < min_bp {
             break;
@@ -111,9 +120,18 @@ fn infix_binding_power(op: char) -> (u8, u8) {
     match op {
         '+' | '-' => (1, 2),
         '*' | '/' => (3, 4),
-        '.' => (8, 7),
+        '.' => (10, 9),
         _ => unreachable!(),
     }
+}
+
+fn postfix_binding_power(op: char) -> Option<(u8, ())> {
+    let res = match op {
+        '!' => (7, ()),
+        _ => return None,
+    };
+
+    Some(res)
 }
 
 #[test]
@@ -135,7 +153,13 @@ fn tests() {
 
     let s = expr("--1 * 2");
     assert_eq!(s.to_string(), "(* (- (- 1)) 2)");
-    
+
     let s = expr("--f . g");
     assert_eq!(s.to_string(), "(- (- (. f g)))");
+
+    let s = expr("-9!");
+    assert_eq!(s.to_string(), "(- (! 9))");
+    
+    let s = expr("f . g !");
+    assert_eq!(s.to_string(), "(! (. f g))");
 }
