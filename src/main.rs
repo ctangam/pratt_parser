@@ -1,3 +1,5 @@
+mod dijkstra;
+
 fn main() {
     println!("Hello, world!");
 }
@@ -209,7 +211,7 @@ fn tests() {
          : e",
     );
     assert_eq!(s.to_string(), "(? a b (? c d e))");
-    
+
     let s = expr("a = 0 ? b : c = d");
     assert_eq!(s.to_string(), "(= a (= (? 0 b c) d))")
 }
