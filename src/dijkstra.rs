@@ -47,42 +47,60 @@ impl fmt::Display for S {
 
 fn expr(input: &str) -> S {
     let mut lexer = Lexer::new(input);
-    expr_bp(&mut lexer, 0).unwrap()
+    expr_bp(&mut lexer).unwrap()
 }
 
-fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> Option<S> {
-    let mut lhs = None;
+struct Frame {
+    min_bp: u8,
+    lhs: Option<S>,
+    token: Option<char>,
+}
+
+fn expr_bp(lexer: &mut Lexer) -> Option<S> {
+    let mut top = Frame {
+        min_bp: 0,
+        lhs: None,
+        token: None,
+    };
+    let mut stack = Vec::new();
 
     loop {
-        let token = match lexer.peek() {
-            Some(token) => token,
-            None => break,
-        };
+        let token = lexer.peek();
 
-        let r_bp = match binding_power(token, lhs.is_none()) {
-            Some((l_bp, r_bp)) if min_bp <= l_bp => r_bp,
-            _ => return lhs,
+        let (token, r_bp) = match binding_power(token, top.lhs.is_none()) {
+            Some((l_bp, r_bp)) if top.min_bp <= l_bp => (token?, r_bp),
+            _ => {
+                let res = top;
+                top = match stack.pop() {
+                    Some(it) => it,
+                    None => return res.lhs,
+                };
+                if res.token == Some('(') {
+                    assert_eq!(lexer.next(), Some(')'));
+                    top.lhs = res.lhs;
+                    continue;
+                }
+                let mut args = Vec::new();
+                args.extend(top.lhs);
+                args.extend(res.lhs);
+                top.lhs = Some(S::Cons(res.token.unwrap(), args));
+                continue;
+            }
         };
 
         lexer.next();
-        
-        let rhs = expr_bp(lexer, r_bp);
-        if token == '(' {
-            assert_eq!(lexer.next(), Some(')'));
-            lhs = rhs;
-            continue;
-        }
 
-        let mut args = Vec::new();
-        args.extend(lhs);
-        args.extend(rhs);
-        lhs = Some(S::Cons(token, args));
+        stack.push(top);
+        top = Frame {
+            min_bp: r_bp,
+            lhs: None,
+            token: Some(token),
+        };
     }
-
-    lhs
 }
 
-fn binding_power(token: char, prefix: bool) -> Option<(u8, u8)> {
+fn binding_power(token: Option<char>, prefix: bool) -> Option<(u8, u8)> {
+    let token = token?;
     let res = match token {
         '0'..='9' | 'a'..='z' | 'A'..='Z' => (99, 100),
         '(' => (99, 0),
