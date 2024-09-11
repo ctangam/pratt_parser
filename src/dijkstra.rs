@@ -31,7 +31,7 @@ impl fmt::Display for S {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             S::Cons(head, rest) => {
-                if rest.is_empty(){
+                if rest.is_empty() {
                     write!(f, "{}", head)
                 } else {
                     write!(f, "({}", head)?;
@@ -51,15 +51,7 @@ fn expr(input: &str) -> S {
 }
 
 fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> Option<S> {
-    let mut lhs = match lexer.peek() {
-        Some('(') => {
-            lexer.next();
-            let lhs = expr_bp(lexer, 0).unwrap();
-            assert_eq!(lexer.next(), Some(')'));
-            Some(lhs)
-        }
-        _ => None,
-    };
+    let mut lhs = None;
 
     loop {
         let token = match lexer.peek() {
@@ -67,29 +59,33 @@ fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> Option<S> {
             None => break,
         };
 
-        if let Some((l_bp, r_bp)) = binding_power(token, lhs.is_none()) {
-            if l_bp < min_bp {
-                break;
-            }
-            lexer.next();
-            let rhs = expr_bp(lexer, r_bp);
-            let mut args = Vec::new();
-            args.extend(lhs);
-            args.extend(rhs);
-            lhs = Some(S::Cons(token, args));
+        let r_bp = match binding_power(token, lhs.is_none()) {
+            Some((l_bp, r_bp)) if min_bp <= l_bp => r_bp,
+            _ => return lhs,
+        };
 
+        lexer.next();
+        
+        let rhs = expr_bp(lexer, r_bp);
+        if token == '(' {
+            assert_eq!(lexer.next(), Some(')'));
+            lhs = rhs;
             continue;
         }
 
-        break;
+        let mut args = Vec::new();
+        args.extend(lhs);
+        args.extend(rhs);
+        lhs = Some(S::Cons(token, args));
     }
 
     lhs
 }
 
-fn binding_power(op: char, prefix: bool) -> Option<(u8, u8)> {
-    let res = match op {
+fn binding_power(token: char, prefix: bool) -> Option<(u8, u8)> {
+    let res = match token {
         '0'..='9' | 'a'..='z' | 'A'..='Z' => (99, 100),
+        '(' => (99, 0),
         '=' => (2, 1),
         '+' | '-' if prefix => (99, 9),
         '+' | '-' => (5, 6),
