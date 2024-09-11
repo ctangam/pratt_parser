@@ -96,7 +96,14 @@ fn expr_bp(lexer: &mut Lexer, min_bp: u8) -> S {
                 break;
             }
             lexer.next();
-            lhs = S::Cons(op, vec![lhs]);
+
+            lhs = if op == '[' {
+                let rhs = expr_bp(lexer, 0);
+                assert_eq!(lexer.next(), Token::Op(']'));
+                S::Cons(op, vec![lhs, rhs])
+            } else {
+                S::Cons(op, vec![lhs])
+            };
 
             continue;
         }
@@ -138,7 +145,7 @@ fn infix_binding_power(op: char) -> Option<(u8, u8)> {
 
 fn postfix_binding_power(op: char) -> Option<(u8, ())> {
     let res = match op {
-        '!' => (7, ()),
+        '!' | '[' => (7, ()),
         _ => return None,
     };
 
@@ -176,4 +183,7 @@ fn tests() {
 
     let s = expr("(((0)))");
     assert_eq!(s.to_string(), "0");
+
+    let s = expr("x[0][1]");
+    assert_eq!(s.to_string(), "([ ([ x 0) 1)");
 }
