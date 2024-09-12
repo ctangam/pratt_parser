@@ -15,14 +15,11 @@ impl Lexer {
     fn next(&mut self) -> Option<char> {
         self.tokens.pop()
     }
-
-    fn peek(&mut self) -> Option<char> {
-        self.tokens.last().copied()
-    }
 }
 
 use std::fmt;
 
+#[derive(Debug)]
 enum S {
     Cons(char, Vec<S>),
 }
@@ -50,6 +47,7 @@ fn expr(input: &str) -> S {
     expr_bp(&mut lexer).unwrap()
 }
 
+#[derive(Debug)]
 struct Frame {
     min_bp: u8,
     lhs: Option<S>,
@@ -65,30 +63,37 @@ fn expr_bp(lexer: &mut Lexer) -> Option<S> {
     let mut stack = Vec::new();
 
     loop {
-        let token = lexer.peek();
+        let token = lexer.next();
+        dbg!(&token);
+        dbg!(&top);
+        dbg!(&stack);
 
-        let (token, r_bp) = match binding_power(token, top.lhs.is_none()) {
-            Some((l_bp, r_bp)) if top.min_bp <= l_bp => (token?, r_bp),
-            _ => {
-                let res = top;
-                top = match stack.pop() {
-                    Some(it) => it,
-                    None => return res.lhs,
-                };
-                if res.token == Some('(') {
-                    assert_eq!(lexer.next(), Some(')'));
-                    top.lhs = res.lhs;
-                    continue;
+        let (token, r_bp) = loop {
+            match binding_power(token, top.lhs.is_none()) {
+                Some((l_bp, r_bp)) if top.min_bp <= l_bp => break (token?, r_bp),
+                _ => {
+                    let res = top;
+                    top = match stack.pop() {
+                        Some(it) => it,
+                        None => return res.lhs,
+                    };
+
+                    let mut args = Vec::new();
+                    args.extend(top.lhs);
+                    args.extend(res.lhs);
+                    let token = res.token.unwrap();
+                    top.lhs = Some(S::Cons(token, args));
                 }
-                let mut args = Vec::new();
-                args.extend(top.lhs);
-                args.extend(res.lhs);
-                top.lhs = Some(S::Cons(res.token.unwrap(), args));
-                continue;
             }
         };
 
-        lexer.next();
+        if token == ')' {
+            assert_eq!(top.token, Some('('));
+            let res = top;
+            top = stack.pop().unwrap();
+            top.lhs = res.lhs;
+            continue;
+        }
 
         stack.push(top);
         top = Frame {
@@ -104,6 +109,7 @@ fn binding_power(token: Option<char>, prefix: bool) -> Option<(u8, u8)> {
     let res = match token {
         '0'..='9' | 'a'..='z' | 'A'..='Z' => (99, 100),
         '(' => (99, 0),
+        ')' => (0, 100),
         '=' => (2, 1),
         '+' | '-' if prefix => (99, 9),
         '+' | '-' => (5, 6),
